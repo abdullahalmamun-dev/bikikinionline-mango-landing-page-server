@@ -1,21 +1,18 @@
-// backend/src/routes/mango.ts
-import express, { Request, Response } from 'express';
-import Mango from '../models/Mango';
+import express from 'express';
+import Mango from '../models/Mango.js';
 
 const router = express.Router();
 
-// Get all mangoes
-router.get('/', (async (req: Request, res: Response) => {
+router.get('/', async (req, res) => {
   try {
     const mangoes = await Mango.find();
     res.json(mangoes);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching mangoes', error });
   }
-}) as express.RequestHandler);
+});
 
-// Get mango by ID
-router.get('/:id', (async (req: Request, res: Response) => {
+router.get('/:id', async (req, res) => {
   try {
     const mango = await Mango.findById(req.params.id);
     if (!mango) {
@@ -25,10 +22,9 @@ router.get('/:id', (async (req: Request, res: Response) => {
   } catch (error) {
     res.status(500).json({ message: 'Error fetching mango', error });
   }
-}) as express.RequestHandler);
+});
 
-// Create new mango
-router.post('/', (async (req: Request, res: Response) => {
+router.post('/', async (req, res) => {
   try {
     const mango = new Mango(req.body);
     await mango.save();
@@ -36,6 +32,6 @@ router.post('/', (async (req: Request, res: Response) => {
   } catch (error) {
     res.status(500).json({ message: 'Error creating mango', error });
   }
-}) as express.RequestHandler);
+});
 
 export default router;
