@@ -1,11 +1,33 @@
 import express from 'express';
 import Order from '../models/Order.js';
 import mongoose from 'mongoose';
+import crypto from 'crypto'
+import bizSdk from 'facebook-nodejs-business-sdk'
 
 const router = express.Router();
 
+// Initialize Facebook SDK
+const ServerEvent = bizSdk.ServerEvent
+const EventRequest = bizSdk.EventRequest
+const UserData = bizSdk.UserData
+const CustomData = bizSdk.CustomData
+
+const pixelId = '1216660336852015'
+
+// Hash function for PII data
+function hashValue(value) {
+  if (!value) return ''
+  return crypto
+    .createHash('sha256')
+    .update(value.toLowerCase().trim())
+    .digest('hex')
+}
+
+
 router.post('/', async (req, res) => {
   try {
+
+
     const { customerName, phoneNumber, address, products, deliveryArea } = req.body;
 
     // Validation
@@ -36,7 +58,7 @@ router.post('/', async (req, res) => {
 
     // Calculate totals
     const subtotal = processedProducts.reduce((sum, p) => sum + p.total, 0);
-    const deliveryCharge = deliveryArea === 'dhaka' ? 80 : 150;
+    const deliveryCharge = deliveryArea === 'dhaka' ? 100 : 150;
     const grandTotal = subtotal + deliveryCharge;
 
     // Create order
@@ -61,6 +83,39 @@ router.post('/', async (req, res) => {
 
     const savedOrder = await order.save();
     
+    // Prepare Facebook Conversion API data
+    const userData = (new UserData())
+      .setPhones([hashValue(phoneNumber)])
+      .setClientIpAddress(request.headers.get('x-forwarded-for') || '')
+      .setClientUserAgent(request.headers.get('user-agent') || '')
+      .setFbp(request.cookies?.get('_fbp')?.value || '')
+      .setFbc(request.cookies?.get('_fbc')?.value || '')
+
+      const customData = (new CustomData())
+      .setCurrency('BDT')
+      .setValue(savedOrder.grandTotal)
+      .setContents(products.map(p => ({
+        id: p.productId,
+        quantity: p.quantity,
+        item_price: p.price
+      })))
+      
+      const serverEvent = (new ServerEvent())
+      .setEventName('Purchase')
+      .setEventTime(Math.floor(Date.now() / 1000))
+      .setUserData(userData)
+      .setCustomData(customData)
+      .setEventId(savedOrder._id.toString())
+      .setActionSource('website')
+
+    // Send to Facebook Conversion API
+    const eventsData = [serverEvent]
+    const eventRequest = (new EventRequest(accessToken, pixelId))
+      .setEvents(eventsData)
+
+    await eventRequest.execute()
+
+
     res.status(201).json({
       success: true,
       data: savedOrder
@@ -85,6 +140,7 @@ router.post('/', async (req, res) => {
   }
 });
 
+
 router.get('/', async (req, res) => {
   try {
     const orders = await Order.find();
@@ -100,34 +156,73 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.put('/:id/status', async (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
-    const { status, adminName } = req.body;
-    const validStatuses = ['confirmed', 'advanced', 'delivering', 'delivered', 'failed', 'rejected'];
+    const { id } = req.params;
+    const updateData = req.body;
 
-    if (!validStatuses.includes(status)) {
-      return res.status(400).json({ message: 'Invalid status' });
+    // Validate order exists
+    const existingOrder = await Order.findById(id);
+    if (!existingOrder) {
+      return res.status(404).json({
+        success: false,
+        error: 'Order not found'
+      });
     }
 
-    const order = await Order.findById(req.params.id);
-    if (!order) {
-      return res.status(404).json({ message: 'Order not found' });
+    // Process products if updated
+    if (updateData.products) {
+      updateData.products = updateData.products.map(p => ({
+        name: p.name,
+        weight: p.weight,
+        price: Number(p.price),
+        quantity: Number(p.quantity) || 1,
+        total: Number(p.price) * (Number(p.quantity) || 1)
+      }));
     }
 
-    order.statusHistory.push({
-      status,
-      timestamp: new Date(),
-      updatedBy: adminName || 'admin'
+    // Recalculate totals if products or delivery area changes
+    if (updateData.products || updateData.deliveryArea) {
+      const products = updateData.products || existingOrder.products;
+      const deliveryArea = updateData.deliveryArea || existingOrder.deliveryArea;
+      
+      updateData.subtotal = products.reduce((sum, p) => sum + p.total, 0);
+      updateData.deliveryCharge = deliveryArea === 'dhaka' ? 80 : 150;
+      updateData.grandTotal = updateData.subtotal + updateData.deliveryCharge;
+    }
+
+    // Update order with validation
+    const updatedOrder = await Order.findByIdAndUpdate(
+      id,
+      { $set: updateData },
+      {
+        new: true,
+        runValidators: true,
+        overwrite: false,
+        context: 'query'
+      }
+    );
+
+    res.json({
+      success: true,
+      data: updatedOrder
     });
-    
-    order.currentStatus = status;
-    await order.save();
-    
-    return res.json(order);
+
   } catch (error) {
-    return res.status(500).json({ 
-      message: 'Error updating status',
-      error: error.message || 'Unknown error'
+    console.error('Order update error:', error);
+    
+    if (error instanceof mongoose.Error.ValidationError) {
+      const errors = Object.values(error.errors).map(e => e.message);
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: errors
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error'
     });
   }
 });

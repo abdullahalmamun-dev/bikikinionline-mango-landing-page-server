@@ -32,6 +32,32 @@ const AddressSchema = new Schema({
 });
 
 const OrderSchema = new Schema({
+  customerName: {
+    type: String,
+    required: [true, 'Customer name is required'],
+    trim: true,
+    minlength: [3, 'Customer name must be at least 3 characters']
+  },
+  phoneNumber: {
+    type: String,
+    required: [true, 'Phone number is required'],
+    validate: {
+      validator: function(v) {
+        return /^(?:\+88|88)?(01[3-9]\d{8})$/.test(v);
+      },
+      message: props => `${props.value} is not a valid Bangladeshi phone number!`
+    }
+  },
+  address: {
+    type: AddressSchema,
+    required: [true, 'Address is required'],
+    validate: {
+      validator: function(address) {
+        return address.house && address.area && address.policeStation && address.district && address.division;
+      },
+      message: 'Address must contain house, area, police station, district and division'
+    }
+  },
   orderNumber: {
     type: String,
     required: true,
