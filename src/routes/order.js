@@ -1,27 +1,11 @@
 import express from 'express';
 import Order from '../models/Order.js';
 import mongoose from 'mongoose';
-import crypto from 'crypto'
-import bizSdk from 'facebook-nodejs-business-sdk'
+
 
 const router = express.Router();
 
-// Initialize Facebook SDK
-const ServerEvent = bizSdk.ServerEvent
-const EventRequest = bizSdk.EventRequest
-const UserData = bizSdk.UserData
-const CustomData = bizSdk.CustomData
 
-const pixelId = '1216660336852015'
-
-// Hash function for PII data
-function hashValue(value) {
-  if (!value) return ''
-  return crypto
-    .createHash('sha256')
-    .update(value.toLowerCase().trim())
-    .digest('hex')
-}
 
 
 router.post('/', async (req, res) => {
@@ -82,38 +66,7 @@ router.post('/', async (req, res) => {
     });
 
     const savedOrder = await order.save();
-    
-    // Prepare Facebook Conversion API data
-    const userData = (new UserData())
-      .setPhones([hashValue(phoneNumber)])
-      .setClientIpAddress(request.headers.get('x-forwarded-for') || '')
-      .setClientUserAgent(request.headers.get('user-agent') || '')
-      .setFbp(request.cookies?.get('_fbp')?.value || '')
-      .setFbc(request.cookies?.get('_fbc')?.value || '')
 
-      const customData = (new CustomData())
-      .setCurrency('BDT')
-      .setValue(savedOrder.grandTotal)
-      .setContents(products.map(p => ({
-        id: p.productId,
-        quantity: p.quantity,
-        item_price: p.price
-      })))
-      
-      const serverEvent = (new ServerEvent())
-      .setEventName('Purchase')
-      .setEventTime(Math.floor(Date.now() / 1000))
-      .setUserData(userData)
-      .setCustomData(customData)
-      .setEventId(savedOrder._id.toString())
-      .setActionSource('website')
-
-    // Send to Facebook Conversion API
-    const eventsData = [serverEvent]
-    const eventRequest = (new EventRequest(accessToken, pixelId))
-      .setEvents(eventsData)
-
-    await eventRequest.execute()
 
 
     res.status(201).json({
