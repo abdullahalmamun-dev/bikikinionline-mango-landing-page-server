@@ -140,7 +140,7 @@ router.put('/:id', async (req, res) => {
       const deliveryArea = updateData.deliveryArea || existingOrder.deliveryArea;
       
       updateData.subtotal = products.reduce((sum, p) => sum + p.total, 0);
-      updateData.deliveryCharge = deliveryArea === 'dhaka' ? 80 : 150;
+      updateData.deliveryCharge = deliveryArea === 'dhaka' ? 100 : 150;
       updateData.grandTotal = updateData.subtotal + updateData.deliveryCharge;
     }
 
