@@ -2,15 +2,10 @@ import express from 'express';
 import Order from '../models/Order.js';
 import mongoose from 'mongoose';
 
-
 const router = express.Router();
-
-
-
 
 router.post('/', async (req, res) => {
   try {
-
 
     const { customerName, phoneNumber, address, products, deliveryArea } = req.body;
 
@@ -49,14 +44,7 @@ router.post('/', async (req, res) => {
     const order = new Order({
       customerName: customerName.trim(),
       phoneNumber: phoneNumber.trim(),
-      address: {
-        house: address.house.trim(),
-        road: address.road?.trim(),
-        area: address.area.trim(),
-        policeStation: address.policeStation.trim(),
-        district: address.district.trim(),
-        division: address.division.trim()
-      },
+      address: address.trim(),
       deliveryArea,
       products: processedProducts,
       subtotal,
@@ -66,8 +54,6 @@ router.post('/', async (req, res) => {
     });
 
     const savedOrder = await order.save();
-
-
 
     res.status(201).json({
       success: true,

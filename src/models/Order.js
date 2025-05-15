@@ -5,7 +5,7 @@ const { Schema } = mongoose;
 const StatusHistorySchema = new Schema({
   status: {
     type: String,
-    enum: ['ordered', 'confirmed', 'advanced', 'delivering', 'delivered', 'failed', 'rejected']
+    enum: ['ordered', 'confirmed', 'advanced', 'delivering', 'delivered', 'failed', 'rejected', 'hidden']
   },
   timestamp: {
     type: Date,
@@ -20,15 +20,6 @@ const OrderProductSchema = new Schema({
   price: Number,
   quantity: Number,
   total: Number
-});
-
-const AddressSchema = new Schema({
-  house: String,
-  road: String,
-  area: String,
-  policeStation: String,
-  district: String,
-  division: String
 });
 
 const OrderSchema = new Schema({
@@ -48,30 +39,16 @@ const OrderSchema = new Schema({
       message: props => `${props.value} is not a valid Bangladeshi phone number!`
     }
   },
-  address: {
-    type: AddressSchema,
+ address: {
+    type: String,
     required: [true, 'Address is required'],
-    validate: {
-      validator: function(address) {
-        return address.house && address.area && address.policeStation && address.district && address.division;
-      },
-      message: 'Address must contain house, area, police station, district and division'
-    }
+    trim: true
   },
   orderNumber: {
     type: String,
     required: true,
     unique: true
   },
-  customerName: {
-    type: String,
-    required: true
-  },
-  phoneNumber: {
-    type: String,
-    required: true
-  },
-  address: AddressSchema,
   deliveryArea: {
     type: String,
     required: true
@@ -82,7 +59,7 @@ const OrderSchema = new Schema({
   grandTotal: Number,
   currentStatus: {
     type: String,
-    enum: ['ordered', 'confirmed', 'advanced', 'delivering', 'delivered', 'failed', 'rejected'],
+    enum: ['ordered', 'confirmed', 'advanced', 'delivering', 'delivered', 'failed', 'rejected','hidden'],
     default: 'ordered'
   },
   statusHistory: [StatusHistorySchema]
